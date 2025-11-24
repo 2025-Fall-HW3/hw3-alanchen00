@@ -62,7 +62,10 @@ class EqualWeightPortfolio:
         """
         TODO: Complete Task 1 Below
         """
-
+        for asset in assets:
+            self.portfolio_weights[asset]=1/len(assets)
+        
+        self.portfolio_weights[self.exclude]=0
         """
         TODO: Complete Task 1 Above
         """
@@ -114,7 +117,17 @@ class RiskParityPortfolio:
         TODO: Complete Task 2 Below
         """
 
+        for i in range(self.lookback+1,len(df)):
+            window_returns=df_returns[assets].iloc[i-self.lookback:i]
 
+            vol=window_returns.std()
+            vol=vol.replace(0,1e-6)
+            inv_vol=1/vol
+            weights=inv_vol/inv_vol.sum()
+
+            self.portfolio_weights.loc[df.index[i],assets]=weights.values
+
+        self.portfolio_weights[self.exclude]=0
 
         """
         TODO: Complete Task 2 Above
@@ -190,9 +203,25 @@ class MeanVariancePortfolio:
 
                 # Sample Code: Initialize Decision w and the Objective
                 # NOTE: You can modify the following code
-                w = model.addMVar(n, name="w", ub=1)
-                model.setObjective(w.sum(), gp.GRB.MAXIMIZE)
+                w = model.addMVar(shape=n, lb=0, ub=1, name="w")
+                risk = 0.5 * w @ Sigma @ w
+                ret = mu @ w
+                model.setObjective(mu @ w - 0.5*self.gamma * w @ Sigma @ w, gp.GRB.MAXIMIZE)
+                model.addConstr(w.sum() == 1, name="budget")
 
+                model.optimize()
+
+                if model.status not in (gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL):
+                    return [1.0 / n] * n
+
+                sol = w.X
+                sol = np.maximum(sol, 0)
+                s = sol.sum()
+                if s == 0:
+                    sol = np.ones(n) / n
+                else:
+                    sol = sol / s
+                
                 """
                 TODO: Complete Task 3 Above
                 """
